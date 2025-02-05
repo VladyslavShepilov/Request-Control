@@ -2,6 +2,9 @@ from typing import Callable, Any
 from datetime import datetime, timedelta
 import inspect
 from threading import Lock
+from contextlib import contextmanager
+from functools import wraps
+from asyncio import iscoroutinefunction
 
 
 class KeywordSingleton(type):
@@ -72,28 +75,42 @@ class IntervalTrackerMixin:
 
 class ThrottlerDecorator(IntervalTrackerMixin, metaclass=KeywordSingleton):
     def __init__(self, duration: int, limit: int, target: Any = None):
-        IntervalTrackerMixin.__init__(self, duration, limit)
+        super().__init__(duration, limit)  # Use super() instead of direct Mixin init
         self.target = target
 
-    def __call__(self, class_or_func):
+    def __call__(self, obj: Any) -> Any:
         """Handles proper decorator invocation."""
-        if inspect.isclass(class_or_func):
-            return self._decorate_class(class_or_func)
-        elif inspect.isfunction(class_or_func):
-            return self._decorate_func(class_or_func)
-        else:
-            raise ValueError("Invalid decorated type")
+        if inspect.isclass(obj):
+            return self._decorate_class(obj)
+        if inspect.isfunction(obj) or iscoroutinefunction(obj):
+            return self._decorate_func(obj)
+        raise ValueError("Invalid decorated type")
 
     def _decorate_func(self, func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
-            if self.make_request():
-                return func(*args, **kwargs)
-            else:
-                raise RuntimeError("Request throttled due to exceeding limit")
-        return wrapper
+        """Wraps a function to enforce throttling."""
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            with self.throttling_context():
+                return await func(*args, **kwargs)
 
-    def _decorate_class(self, cls) -> type:
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            with self.throttling_context():
+                return func(*args, **kwargs)
+
+        return async_wrapper if iscoroutinefunction(func) else sync_wrapper
+
+    def _decorate_class(self, cls: type) -> type:
+        """Wraps all methods of a class except magic methods."""
         for name, func in inspect.getmembers(cls, predicate=inspect.isfunction):
             if not name.startswith("__"):
                 setattr(cls, name, self._decorate_func(func))
         return cls
+
+    @contextmanager
+    def throttling_context(self):
+        """Context manager to handle request throttling."""
+        if self.make_request():
+            yield
+        else:
+            raise RuntimeError("Request throttled due to exceeding limit")
