@@ -1,4 +1,4 @@
-# Universal Small Anti-Throttling Decorator
+# Universal "Reverse Throttler"
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
