@@ -21,7 +21,7 @@ class KeywordSingleton(type):
 
     @classmethod
     def clear_instances(cls):
-        """Removes all stored singleton instances (useful for tests)."""
+        """Removes all stored singleton instances"""
         cls.__instances.clear()
 
 
