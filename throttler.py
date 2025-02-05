@@ -33,7 +33,7 @@ class IntervalTrackerMixin:
         def __str__(self):
             return f"{self.limit} / {str(self.duration)}"
 
-    def __init__(self, duration: int, limit: int, execution_time: int = 10):
+    def __init__(self, duration: int, limit: int, execution_time):
         """
         Sets throttling interval.
         Optionally 'execution_time' to match throttling exactly.
@@ -77,8 +77,12 @@ class IntervalTrackerMixin:
 
 
 class ThrottlerDecorator(IntervalTrackerMixin, metaclass=KeywordSingleton):
-    def __init__(self, duration: int, limit: int, target: Any = None):
-        super().__init__(duration, limit)  # Use super() instead of direct Mixin init
+    def __init__(
+        self, duration: int,
+        limit: int, target: Any = None,
+        execution_time: int = 10
+    ):
+        super().__init__(duration, limit, execution_time)
         self.target = target
 
     def __call__(self, obj: Any) -> Any:
