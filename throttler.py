@@ -22,7 +22,7 @@ class KeywordSingleton(type):
 
 class IntervalTrackerMixin:
     """
-    Tracks actions over a specified interval to enforce throttling.
+    Tracks actions over a specified interval.
     """
 
     class Interval:
@@ -33,8 +33,13 @@ class IntervalTrackerMixin:
         def __str__(self):
             return f"{self.limit} / {str(self.duration)}"
 
-    def __init__(self, duration: int, limit: int):
+    def __init__(self, duration: int, limit: int, execution_time: int = 10):
+        """
+        Sets throttling interval.
+        Optionally 'execution_time' to match throttling exactly.
+        """
         self.interval = self.Interval(duration, limit)
+        self._execution_time: timedelta = timedelta(milliseconds=execution_time)
         self.actions_counter: int = 0
         self.interval_start: datetime | None = None
         self.interval_end: datetime | None = None
@@ -46,12 +51,10 @@ class IntervalTrackerMixin:
         self.interval_end = submit_time + self.interval.duration
         self.actions_counter = 0
 
-    @staticmethod
-    def now_execution_time() -> tuple[datetime, datetime]:
+    def now_execution_time(self) -> tuple[datetime, datetime]:
         """Gets the current time and estimated execution time."""
-        execution_time = timedelta(seconds=1)  # TODO - Should be configurable
         now = datetime.now()
-        submit_time = now + execution_time
+        submit_time = now + self._execution_time
         return now, submit_time
 
     def make_request(self) -> bool:
