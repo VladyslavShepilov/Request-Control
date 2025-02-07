@@ -1,13 +1,18 @@
 import unittest
 import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
+from datetime import datetime, timedelta
+from functools import wraps
+
 from throttler import ThrottlerDecorator, KeywordSingleton
 
 
 class TestThrottlerDecorator(unittest.TestCase):
     def setUp(self):
         """Set up two decorators with the same and different targets"""
-        self.duration = 10
+        self.duration = 20
         self.limit = 500000
         self.target = "unique_key"
 
@@ -93,8 +98,6 @@ class TestThrottlerDecorator(unittest.TestCase):
         def sample_function(*args, **kwargs):
             return "Executed"
 
-        from concurrent.futures import ThreadPoolExecutor
-
         def call_function(*args, **kwargs):
             try:
                 return sample_function()
@@ -116,6 +119,55 @@ class TestThrottlerDecorator(unittest.TestCase):
 
         self.assertEqual(success_count, self.limit)  # Ensure limit is respected
         self.assertGreater(throttled_count, 0)  # Some should be throttled
+
+    def test_performance_comparision(self):
+        max_workers = 10
+
+        def time_decorator(func: Callable):
+            @wraps(func)
+            def wrapper(*args, **kwrags):
+                start_time = datetime.now()
+                func(*args, **kwrags)
+                end_time = datetime.now()
+                return end_time - start_time
+            return wrapper
+
+        @time_decorator
+        def sample_function(*args, **kwargs):
+            return "Executed"
+
+        @time_decorator
+        @self.throttler_1
+        def decorated_function(*args, **kwargs):
+            return "Executed"
+
+        def call_function(func: Callable, *args):
+            try:
+                return func()
+            except RuntimeError:
+                return "Throttled"
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(call_function, sample_function) for _ in range(self.limit)
+            ]
+            results = [future.result() for future in futures]
+
+        function_base_performance = sum(results, start=datetime.min) - datetime.min
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(call_function, decorated_function) for _ in range(self.limit)
+            ]
+            results = [future.result() for future in futures]
+
+        function_decorated_performance = sum(results, start=datetime.min) - datetime.min
+
+        print(
+            f"Time for {len(results)} requests\n"
+            f"Sample func: {function_base_performance}\n"
+            f"Decorated func: {function_decorated_performance}\n"
+        )
 
 
 if __name__ == "__main__":
