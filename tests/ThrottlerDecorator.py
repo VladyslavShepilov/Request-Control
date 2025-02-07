@@ -7,8 +7,8 @@ from throttler import ThrottlerDecorator, KeywordSingleton
 class TestThrottlerDecorator(unittest.TestCase):
     def setUp(self):
         """Set up two decorators with the same and different targets"""
-        self.duration = 1
-        self.limit = 5
+        self.duration = 10
+        self.limit = 500000
         self.target = "unique_key"
 
         self.throttler_1 = ThrottlerDecorator(self.duration, self.limit, target=self.target)
@@ -86,6 +86,36 @@ class TestThrottlerDecorator(unittest.TestCase):
 
         # Now, it should allow requests again
         self.assertEqual(sample_function(), "Executed")
+
+    def test_multithreaded_throttling(self):
+        """Test the throttler in a multithreaded environment"""
+        @self.throttler_1
+        def sample_function(*args, **kwargs):
+            return "Executed"
+
+        from concurrent.futures import ThreadPoolExecutor
+
+        def call_function(*args, **kwargs):
+            try:
+                return sample_function()
+            except RuntimeError:
+                return "Throttled"
+
+        success_count = 0
+        throttled_count = 0
+
+        throtteled = 10  # Amount must not be sent
+        total = self.limit + throtteled
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(call_function) for _ in range(total)]
+            results = [future.result() for future in futures]
+
+        success_count = results.count("Executed")
+        throttled_count = results.count("Throttled")
+
+        self.assertEqual(success_count, self.limit)  # Ensure limit is respected
+        self.assertGreater(throttled_count, 0)  # Some should be throttled
 
 
 if __name__ == "__main__":
