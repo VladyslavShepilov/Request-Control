@@ -104,7 +104,7 @@ class TestThrottlerDecorator(unittest.TestCase):
         success_count = 0
         throttled_count = 0
 
-        throtteled = 10  # Amount must not be sent
+        throtteled = 10  # amount must not be sent
         total = self.limit + throtteled
 
         with ThreadPoolExecutor(max_workers=10) as executor:

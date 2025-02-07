@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Callable, Any, Union
 from datetime import datetime, timedelta
 import inspect
 from threading import Lock
@@ -46,8 +46,8 @@ class IntervalTrackerMixin:
         self.interval = self.Interval(duration, limit)
         self._execution_time: timedelta = timedelta(milliseconds=execution_time)
         self.actions_counter: int = 0
-        self.interval_start: datetime | None = None
-        self.interval_end: datetime | None = None
+        self.interval_start: Union[datetime, None] = None
+        self.interval_end: Union[datetime, None] = None
         self.lock = Lock()
 
     def refresh_timers(self, submit_time: datetime):
